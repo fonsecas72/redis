@@ -41,7 +41,19 @@ redis_mode_setup() {
             echo cluster-config-file "${NODE_CONF_DIR}/nodes.conf"
         } >> /etc/redis/redis.conf
 
-        POD_HOSTNAME=$(hostname)
+        for i in {1..5}; do
+            POD_HOSTNAME=$(hostname -f 2>/dev/null)
+            if [[ -n "${POD_HOSTNAME}" ]]; then
+                break
+            fi
+            sleep 1
+        done
+
+        if [[ -z "${POD_HOSTNAME}" ]]; then
+            echo "Failed to resolve FQDN"
+            exit 1
+        fi
+
         POD_IP=$(hostname -i)
         sed -i -e "/myself/ s/[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/${POD_IP}/" "${NODE_CONF_DIR}/nodes.conf"
     else
@@ -142,7 +154,7 @@ start_redis() {
         else
             CLUSTER_ANNOUNCE_IP="${POD_IP}"
         fi
-        
+
         if [[ "${REDIS_MAJOR_VERSION}" != "v7" ]]; then
           exec redis-server /etc/redis/redis.conf \
           --cluster-announce-ip "${CLUSTER_ANNOUNCE_IP}"
